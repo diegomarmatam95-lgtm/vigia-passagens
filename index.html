@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Passagens baratas</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--tx:#1a1d21;--mut:#6b7280;--ac:#0b6bcb}
+@media(prefers-color-scheme:dark){:root{--bg:#14161a;--card:#1e2127;--tx:#eceef1;--mut:#9aa1ac;--ac:#4c9bf0}}
+body{margin:0;font:16px system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem}
+.card{background:var(--card);border-radius:12px;padding:14px 16px;margin:10px 0;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.rota{font-weight:600}.mut{color:var(--mut);font-size:.85rem}
+.preco{font-size:1.2rem;font-weight:700}
+a.b{background:var(--ac);color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600}
+</style></head><body><main>
+<h1>✈️ Passagens baratas</h1><div id="lista">Carregando…</div></main>
+<script>
+const f=d=>d?new Date(d).toLocaleDateString("pt-BR"):"";
+fetch("data/ofertas.json?"+Date.now()).then(r=>r.json()).then(l=>{
+  const el=document.getElementById("lista");
+  if(!l.length){el.textContent="Nenhuma oferta dentro dos seus critérios ainda.";return}
+  el.innerHTML=l.map(o=>`<div class="card"><div>
+    <div class="rota">${o.origem} → ${o.destino}</div>
+    <div class="mut">${f(o.ida)}${o.volta?" – "+f(o.volta):""} · ${o.escalas===0?"direto":o.escalas+" escala(s)"} · ${o.companhia||""}</div>
+    <div class="mut">achado em ${f(o.achado_em)}</div></div>
+    <div style="text-align:right"><div class="preco">${o.moeda} ${Math.round(o.preco)}</div>
+    <a class="b" href="${o.link}" target="_blank" rel="noopener">Comprar</a></div></div>`).join("");
+}).catch(()=>document.getElementById("lista").textContent="Erro ao carregar ofertas.");
+</script></body></html>

@@ -1,0 +1,8 @@
+{
+  "origem": "RIO",
+  "destinos": ["LIS", "MAD", "SCL", "EZE"],
+  "preco_max": 2500,
+  "moeda": "brl",
+  "meses_a_frente": 4,
+  "ida_e_volta": true
+}
