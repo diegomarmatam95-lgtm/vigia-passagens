@@ -1,28 +1,49 @@
-import json, os, urllib.request, urllib.parse
-from datetime import date, datetime
+import json, os, statistics, urllib.request, urllib.parse
+from datetime import date, datetime, timezone
 
 TOKEN = os.environ["TP_TOKEN"]
 MARKER = os.environ.get("TP_MARKER", "")
 cfg = json.load(open("config.json", encoding="utf-8"))
 ARQ = "data/ofertas.json"
 
-try:
-    salvas = {o["id"]: o for o in json.load(open(ARQ, encoding="utf-8"))}
-except Exception:
-    salvas = {}
+inicio = date.fromisoformat(cfg["data_inicio"])
+fim = date.fromisoformat(cfg["data_fim"]) if cfg.get("data_fim") else None
+desc_min = cfg.get("desconto_minimo_pct", 0)
+teto = cfg.get("preco_max", 0)
 
-def meses(n):
-    h = date.today()
-    for i in range(n):
-        m = h.month - 1 + i
-        yield f"{h.year + m // 12}-{m % 12 + 1:02d}"
+def no_periodo(dia):
+    return dia >= inicio.isoformat() and (not fim or dia <= fim.isoformat())
+
+try:
+    antigas = json.load(open(ARQ, encoding="utf-8"))
+except Exception:
+    antigas = []
+salvas = {
+    o["id"]: o for o in antigas
+    if o["destino"] in cfg["destinos"] and no_periodo(o["ida"][:10])
+}
+
+def meses():
+    ano, mes, n = inicio.year, inicio.month, 0
+    while True:
+        if fim:
+            if (ano, mes) > (fim.year, fim.month):
+                break
+        elif n >= cfg["meses_a_frente"]:
+
+            break
+        yield f"{ano}-{mes:02d}"
+        mes += 1
+        if mes == 13:
+            ano, mes = ano + 1, 1
+        n += 1
 
 for destino in cfg["destinos"]:
-    for mes in meses(cfg["meses_a_frente"]):
+    for mes in meses():
         params = {
             "origin": cfg["origem"], "destination": destino,
             "departure_at": mes, "one_way": "false" if cfg["ida_e_volta"] else "true",
-            "currency": cfg["moeda"], "sorting": "price", "limit": 10, "token": TOKEN,
+            "currency": cfg["moeda"], "sorting": "price", "limit": 1000, "token": TOKEN,
         }
         url = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates?" + urllib.parse.urlencode(params)
         try:
@@ -30,25 +51,5 @@ for destino in cfg["destinos"]:
         except Exception as e:
             print("erro", destino, mes, e)
             continue
-        for d in dados:
-            if d["price"] > cfg["preco_max"]:
-                continue
-            link = "https://www.aviasales.com" + d["link"]
-            if MARKER:
-                link += "&marker=" + MARKER
-            oid = f'{d["origin"]}-{d["destination"]}-{d["departure_at"]}-{d.get("return_at","")}'
-            antiga = salvas.get(oid, {})
-            salvas[oid] = {
-                "id": oid, "origem": d["origin"], "destino": d["destination"],
-                "preco": d["price"], "moeda": cfg["moeda"].upper(),
-                "ida": d["departure_at"], "volta": d.get("return_at"),
-                "companhia": d.get("airline"), "escalas": d.get("transfers"),
-                "link": link,
-                "achado_em": antiga.get("achado_em", datetime.utcnow().isoformat(timespec="minutes")),
-            }
-
-hoje = date.today().isoformat()
-lista = [o for o in salvas.values() if o["ida"][:10] >= hoje]
-lista.sort(key=lambda o: o["preco"])
-json.dump(lista, open(ARQ, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-print(len(lista), "ofertas salvas")
+        precos = [d["price"] for d in dados]
+        normal = statistics.median(precos) if len(precos) >= 5 else None
